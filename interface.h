@@ -163,3 +163,4 @@ void display_reply(char* comm, const struct Reply reply)
 }
 
 #endif // INTERFACE_H_
+
