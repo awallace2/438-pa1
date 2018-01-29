@@ -1,7 +1,7 @@
 CC=g++
 
 HOST=http://localhost/
-PORT=6969
+PORT=6961
 
 all: csrd crc
 

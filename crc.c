@@ -69,8 +69,6 @@ int connect_to(const char *host, const int port)
 	// so that other functions such as "process_command" can use it
 	// ------------------------------------------------------------
 
-    printf("Connecting to %s:%d\n", host, port);
-
 	int sockfd;
 
     struct sockaddr_in serv_addr;
@@ -91,8 +89,6 @@ int connect_to(const char *host, const int port)
         perror("Client connect");
         exit(1);
     }
-
-    printf("Connected!\n");
 
 	return sockfd;
 }
@@ -207,10 +203,9 @@ struct Reply process_command(const int sockfd, char* command)
 
     // Receive the command from the server
     char buffer[1024] = {0};
-    int i = read(sockfd, buffer, MAX_DATA);
-    printf("ON CLIENT: %s\n", buffer);
     if (read(sockfd, buffer, MAX_DATA) != 0)
     {
+		printf("ON CLIENT: %s\n", buffer);
         reply.status = SUCCESS;
     }
 

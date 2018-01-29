@@ -31,7 +31,7 @@ int main(int argc, char** argv)
     // TODO: socket(), bind(), listen(), accept(),
     //       select(), recv(), send(), close()
 
-    int m_sock, s_sock;
+    int m_sock, s_sock, max_sock;
     unsigned int message_len;
     char buffer[MAX_MESSAGE];
 
@@ -72,13 +72,24 @@ int main(int argc, char** argv)
     FD_ZERO(&afds);
     FD_SET(m_sock, &afds);  // Add master socket
 
+    max_sock = m_sock;
+
+    printf("Server running\n");
+
     // Run the server
     while (1)
     {
-        printf("Running\n");
-
         memcpy(&rfds, &afds, sizeof(rfds));
-        select(nfds, &rfds, 0, 0, 0);
+
+        int n_socks;
+
+        // https://www.ibm.com/support/knowledgecenter/en/ssw_i5_54/rzab6/xnonblock.htm
+
+        if ((n_socks = select(nfds, &rfds, 0, 0, 0)) < 0)
+        {
+            perror("Select");
+            exit(1);
+        }
 
         if (FD_ISSET(m_sock, &rfds))
         {
@@ -89,8 +100,13 @@ int main(int argc, char** argv)
                 exit(1);
             }
 
-            // NOTE: I think this is an alternative to forking
+            // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
+
+            if (s_sock > max_sock)
+            {
+                max_sock = s_sock;
+            }
         }
 
         for (int fd = 0; fd < nfds; fd++)
