@@ -75,14 +75,14 @@ int connect_to(const char *host, const int port)
     if(sfd!=-1){
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
-        addr.sin_addr.s_addr = *(host);
+        addr.sin_addr.s_addr = host;
         memset(&addr, 0, sizeof(addr));
         if(connect(sfd, (sockaddr*)&addr, sizeof(addr)) == -1){
-            printf("Unable to establish connection\n");
+            cout<<"Unable to establish connection"<<endl;
         }
     }
     else{
-        printf("Error opening socket\n");
+        cout<<"Error opening socket"<<endl;
     }
 
     return sfd;
@@ -118,36 +118,35 @@ struct Reply process_command(const int sockfd, char* command)
     // - CREATE/DELETE/JOIN and "<name>" are separated by one space.
     // ------------------------------------------------------------
     char* chatroom;
-	Reply reply;
     touppercase(command, strlen(command) - 1);
     if (strncmp(command, "CREATE", 6) == 0){
         //chatroom = ;
-        reply.status = SUCCESS;
-        for(int i=0; i<sizeof(reply.list_room); i++){
-            if(*chatroom == reply.list_room[i]){
-                reply.status = FAILURE_ALREADY_EXISTS;
+        Reply.status = SUCCESS;
+        for(int i=0; i<Reply.list_room.size(); i++){
+            if(strcmp(chatroom, Reply.list_room[i]) == 0){
+                Reply.status = FAILURE_ALREADY_EXISTS;
             }
         }
-        if(reply.status == SUCCESS){
-            reply.list_room[sizeof(reply.list_room)-1] = *chatroom;
+        if(Reply.status == SUCCESS){
+            Reply.list_room.[Reply.list_room.end()-1] = chatroom;
         }
     }
     else if (strncmp(command, "DELETE", 6) == 0){
-        reply.status = FAILURE_NOT_EXISTS;
-        for(int i=0; i<sizeof(reply.list_room); i++){
-            if(*chatroom == reply.list_room[i]){
-                reply.list_room[i]=NULL;
-                reply.status = SUCCESS;
+        Reply.status = FAILURE_NOT_EXISTS;
+        for(int i=0; i<Reply.list_room.size(); i++){
+            if(strcmp(chatroom, Reply.list_room[i]) == 0){
+                Reply.list_room[i]=NULL;
+                Reply.status = SUCCESS;
             }
         }
     }
     else if (strncmp(command, "JOIN", 4) == 0){
-        reply.status = FAILURE_NOT_EXISTS;
-        for(int i=0; i<sizeof(reply.list_room); i++){
-            if(*chatroom == reply.list_room[i]){
-                reply.port= sockfd;
-                reply.num_member+=1;
-                reply.status = SUCCESS;
+        Reply.status = FAILURE_NOT_EXISTS;
+        for(int i=0; i<Reply.list_room.size(); i++){
+            if(strcmp(chatroom, Reply.list_room[i]) == 0){
+                Reply.port= sockfd;
+                Reply.num_member+=1;
+                Reply.status = SUCCESS;
             }
         }
     }
@@ -155,11 +154,11 @@ struct Reply process_command(const int sockfd, char* command)
 
     }
     else{
-        reply.status = FAILURE_INVALID;
+        Reply.status = FAILURE_INVALID;
         //display_title();
     }
 
-    display_reply(command, reply);
+    display_reply(command, Reply);
     //Struct Reply 
     // ------------------------------------------------------------
     // GUIDE 2:
