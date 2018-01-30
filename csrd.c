@@ -19,6 +19,16 @@ struct Reply join(const char *chatroom);
 struct Reply list(void);
 struct Reply del(const char *chatroom);
 
+struct ChatRoom
+{
+    // name of chatroom
+    char name[32];
+    // # of members that have joined the chatroom
+    int num_member;
+    // port number to join the chatroom
+    int port;
+}
+
 int main(int argc, char** argv)
 {
     // TODO: Condition for when to get angry
