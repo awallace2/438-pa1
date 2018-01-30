@@ -25,7 +25,7 @@ struct ChatRoom
     char name[32];
     // port number to join the chatroom
     int port;
-}
+};
 
 int main(int argc, char** argv)
 {
@@ -93,6 +93,9 @@ int main(int argc, char** argv)
 
         // https://www.ibm.com/support/knowledgecenter/en/ssw_i5_54/rzab6/xnonblock.htm
 
+        // nfds should be heighest number file descriptor + 1
+        // rfds is read file set
+        // select(...) monitors multiple file descriptors, and returns # of file descriptors in sets
         if ((n_socks = select(nfds, &rfds, 0, 0, 0)) < 0)
         {
             perror("Select");
@@ -110,11 +113,6 @@ int main(int argc, char** argv)
 
             // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
-
-            if (s_sock > max_sock)
-            {
-                max_sock = s_sock;
-            }
         }
 
         for (int fd = 0; fd < nfds; fd++)
@@ -123,9 +121,9 @@ int main(int argc, char** argv)
             {
                 // TODO: Handle request... with sends and receives
                 char mess[1024];
-                read(s_sock, mess, 256);
+                read(fd, mess, 256);
                 printf("ON SERVER: %s\n", mess);
-                write(s_sock, mess, strlen(mess));
+                write(fd, mess, strlen(mess));
                 // send(s_sock, some stuff, );
                 close(fd);
                 FD_CLR(fd, &afds);
