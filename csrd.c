@@ -13,19 +13,28 @@
 #include "interface.h"
 
 #define MAX_MESSAGE 128
+#define MAX_MEMBER 32
+#define MAX_ROOM 32
 
+void handle_request(const char* request);
 struct Reply create(const char* chatroom);
 struct Reply join(const char* chatroom);
 struct Reply list(void);
 struct Reply del(const char* chatroom);
 
-struct ChatRoom
+typedef struct 
 {
-    // name of chatroom
-    char name[32];
-    // port number to join the chatroom
-    int port;
-};
+    // Name of chatroom
+    char room_name[256];
+    // Port number to join the chatroom
+    int port_num;
+    // # of members in chatroom
+    int num_members;
+    // Slave sockets
+    int slave_socket[MAX_MEMBER];
+} chat_room;
+
+chat_room room_db[MAX_ROOM];
 
 int main(int argc, char** argv)
 {
@@ -53,6 +62,13 @@ int main(int argc, char** argv)
     if ((m_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("Master socket");
+        exit(1);
+    }
+
+    int opt = 1;
+    if (setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0)
+    {
+        perror("Set socket options");
         exit(1);
     }
 
@@ -111,6 +127,8 @@ int main(int argc, char** argv)
                 exit(1);
             }
 
+            printf("Accept from port %d\n", ntohs(cli_addr.sin_port));
+
             // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
         }
@@ -119,17 +137,30 @@ int main(int argc, char** argv)
         {
             if (fd != m_sock && FD_ISSET(fd, &rfds))
             {
+                printf("Doing somthing for fd: %d\n", fd);
                 // TODO: Handle request... with sends and receives
                 char mess[1024];
                 read(fd, mess, 256);
                 printf("ON SERVER: %s\n", mess);
-                write(fd, mess, strlen(mess));
+                if (fd > 3)
+                {
+                    write(fd + 1, mess, strlen(mess));
+                }
+                else
+                {
+                    write(fd, mess, strlen(mess));
+                }
                 // send(s_sock, some stuff, );
                 close(fd);
                 FD_CLR(fd, &afds);
             }
         }
     }
+}
+
+void handle_request(const char* request)
+{
+
 }
 
 struct Reply create(const char* chatroom)

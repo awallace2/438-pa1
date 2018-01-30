@@ -234,7 +234,7 @@ void process_chatmode(const char* host, const int port)
 	// At the same time, the client should wait for a message from
 	// the server.
 	// ------------------------------------------------------------
-	
+
     // ------------------------------------------------------------
     // IMPORTANT NOTICE:
     // 1. To get a message from a user, you should use a function
