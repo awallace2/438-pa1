@@ -14,17 +14,15 @@
 
 #define MAX_MESSAGE 128
 
-struct Reply create(const char *chatroom);
-struct Reply join(const char *chatroom);
+struct Reply create(const char* chatroom);
+struct Reply join(const char* chatroom);
 struct Reply list(void);
-struct Reply del(const char *chatroom);
+struct Reply del(const char* chatroom);
 
 struct ChatRoom
 {
     // name of chatroom
     char name[32];
-    // # of members that have joined the chatroom
-    int num_member;
     // port number to join the chatroom
     int port;
 }
@@ -136,7 +134,7 @@ int main(int argc, char** argv)
     }
 }
 
-struct Reply create(const char *chatroom)
+struct Reply create(const char* chatroom)
 {
     // TODO: Check if chatroom exists already
     // TODO: If not, create a new master socket
@@ -144,7 +142,7 @@ struct Reply create(const char *chatroom)
     // TODO: Return a result to inform the client
 }
 
-struct Reply join(const char *chatroom)
+struct Reply join(const char* chatroom)
 {
     // TODO: Check if chatroom exists already
     // TODO: If it does, return the port number of the master socket of that chat room and the current number of memebers in the chatroom
@@ -156,7 +154,7 @@ struct Reply list()
     // TODO: Return the names of all chatrooms
 }
 
-struct Reply del(const char *chatroom)
+struct Reply del(const char* chatroom)
 {
     // TODO: Check if chatroom exits already
     // TODO: If it does, send the warning message "chat room being deleted" to all connected clients before terminating their connections, closing the master socket, and deleting the entry
