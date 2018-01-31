@@ -9,6 +9,8 @@
 #include <string.h>
 #include "interface.h"
 
+#define MAX_MESSAGE 128
+
 
 /*
  * TODO: IMPLEMENT BELOW THREE FUNCTIONS
@@ -178,36 +180,44 @@ struct Reply process_command(const int sockfd, char* command)
 	struct Reply reply;
 	reply.status = FAILURE_UNKNOWN;
 
-    if (strncmp(command, "CREATE ", 7) == 0)
+	// Don't waste a message sent to the server if the command isn't even valid
+    if (strncmp(command, "CREATE ", 7) != 0 && strncmp(command, "DELETE ", 7) != 0 &&
+	    strncmp(command, "JOIN ", 5) != 0 && strncmp(command, "LIST", 4) != 0)
     {
-        command += 7;
-    }
-    else if (strncmp(command, "DELETE ", 7) == 0)
-    {
-        command += 7;
-    }
-    else if (strncmp(command, "JOIN ", 5) == 0)
-    {
-        command += 5;
-    }
-    else if (strncmp(command, "LIST", 4) != 0)
-    {
-        // TODO: It's kinda lame to have a return not at the end of the file, so we should fix it
         reply.status = FAILURE_INVALID;
 
         return reply;
     }
 
-    // Send command to the server
-    write(sockfd, command, strlen(command));
+	if (strncmp(command, "CREATE ", 7) == 0)
+	{
+		// Send command to the server
+		write(sockfd, command, strlen(command));
 
-    // Receive the command from the server
-    char buffer[1024] = {0};
-    if (read(sockfd, buffer, MAX_DATA) != 0)
-    {
-		printf("ON CLIENT: %s\n", buffer);
-        reply.status = SUCCESS;
-    }
+		// Receive the command from the server
+		char port[MAX_DATA];
+		if (read(sockfd, port, MAX_DATA) != 0)
+		{
+			reply.status = SUCCESS;
+			reply.num_member = 0;
+			reply.port = atoi(port);
+		}
+	}
+    else if (strncmp(command, "JOIN ", 5) == 0)
+	{
+		write(sockfd, command, strlen(command));
+
+		// TODO: Read for struct reply
+
+		// Receive the command from the server
+		char port[MAX_DATA];
+		if (read(sockfd, port, MAX_DATA) != 0)
+		{
+			reply.status = SUCCESS;
+			reply.num_member = 1;
+			reply.port = atoi(port);
+		}
+	}
 
 	return reply;
 }
@@ -249,5 +259,22 @@ void process_chatmode(const char* host, const int port)
     //    Don't have to worry about this situation, and you can 
     //    terminate the client program by pressing CTRL-C (SIGINT)
 	// ------------------------------------------------------------
+
+	printf("Connecting to %s:%d\n", host, port);
+
+	int fd = connect_to(host, port);
+
+	printf("Connected to %s:%d\n", host, port);
+
+	while (1)
+	{
+		char message[MAX_MESSAGE];
+		get_message(message, MAX_MESSAGE);
+
+		write(fd, message, MAX_MESSAGE);
+		read(fd, message, MAX_MESSAGE);
+
+		printf("Message %s sent!\n", message);
+	}
 }
 
