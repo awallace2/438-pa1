@@ -1,27 +1,22 @@
-CC=g++ -pthread
+CC=g++
 
 HOST=http://localhost/
-PORT=6931
+PORT=8888
 
 all: csrd crc
 
-debug: csrd_d crc_d
-
 csrd: csrd.c
-	$(CC) -o csrd.out csrd.c
-
-csrd_d: csrd.c
-	$(CC) -o csrd.out csrd.c -g
+	$(CC) -std=c++11 -pthread -o csrd.out csrd.c
 
 crc: crc.c
-	$(CC) -o crc.out crc.c
+	$(CC) -std=c++11 -pthread -o crc.out crc.c
 
-crc_d: crc.c
-	$(CC) -o crc.out crc.c -g
-
-run:
+runc:
 	# Run server in background and then client in foreground after 2 sec
-	./csrd.out $(HOST) $(PORT) & sleep 2 && ./crc.out $(HOST) $(PORT)
+	./crc.out $(HOST) $(PORT)
+
+runs:
+	./csrd.out $(HOST) $(PORT)
 
 clean:
 	rm *.out
