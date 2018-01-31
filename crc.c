@@ -260,21 +260,53 @@ void process_chatmode(const char* host, const int port)
     //    terminate the client program by pressing CTRL-C (SIGINT)
 	// ------------------------------------------------------------
 
-	printf("Connecting to %s:%d\n", host, port);
-
 	int fd = connect_to(host, port);
 
-	printf("Connected to %s:%d\n", host, port);
+	fd_set rfds, afds;
+	int nfds = FD_SETSIZE;
 
+	FD_ZERO(&afds);
+	// Put sever in fd_set
+	FD_SET(fd, &afds);
+	// Put stdin in fd_set
+	FD_SET(STDIN_FILENO, &afds);
+
+	char message[MAX_MESSAGE];
+
+	// Child process send messages
 	while (1)
 	{
-		char message[MAX_MESSAGE];
-		get_message(message, MAX_MESSAGE);
+		memcpy(&rfds, &afds, sizeof(rfds));
 
-		write(fd, message, MAX_MESSAGE);
-		read(fd, message, MAX_MESSAGE);
+		if (select(nfds, &rfds, 0, 0, 0) < 0)
+		{
+			perror("Client chatroom select");
+			exit(1);
+		}
 
-		printf("Message %s sent!\n", message);
+		for (int i = 3; i < nfds; i++)
+		{
+			// If something has been written
+			if (FD_ISSET(STDIN_FILENO, &rfds))
+			{
+				get_message(message, MAX_MESSAGE);
+				if (write(fd, message, MAX_MESSAGE) < 0)
+				{
+					perror("Message failed to send");
+					exit(1);
+				}
+			}
+
+			if (FD_ISSET(fd, &rfds))
+			{
+				if (read(fd, message, MAX_MESSAGE) < 0)
+				{
+					perror("Failed to recieve message");
+					exit(1);
+				}
+				printf(": %s\n", message);
+			}
+		}
 	}
 }
 

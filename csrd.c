@@ -137,7 +137,6 @@ int main(int argc, char** argv)
 
         for (int fd = 0; fd < nfds; fd++)
         {
-            // If the socket has activity on it
             if (fd != m_sock && FD_ISSET(fd, &rfds))
             {
                 char* command = (char*) malloc((MAX_DATA) * sizeof(char));
@@ -266,11 +265,13 @@ void* start_server(void* data)
                 exit(1);
             }
 
+            printf("Someone joined the chatroom!\n");
+
             // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
         }
 
-        for (int fd = 0; fd < nfds; fd++)
+        for (int fd = 3; fd < nfds; fd++)
         {
             // If the socket has activity on it
             if (fd != m_sock && FD_ISSET(fd, &rfds))
@@ -278,15 +279,14 @@ void* start_server(void* data)
                 read(fd, message, MAX_MESSAGE);
 
                 // Trying to broadcast message to all others
-                // for (int kfd = 0; fd < nfds; fd++)
-                // {
-                    // if (fd != kfd)
-                    // {
-                        // write(fd, message, MAX_MESSAGE);
-                    // }
-                // }
-
-                write(fd, message, MAX_MESSAGE);
+                for (int kfd = 3; kfd < 16; kfd++)
+                {
+                    if (fd != kfd)
+                    {
+                        printf("Sending message from %d to %d\n", fd, kfd);
+                        write(kfd, message, MAX_MESSAGE);
+                    }
+                }
             }
         }
     }
