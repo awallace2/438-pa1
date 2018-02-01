@@ -150,8 +150,6 @@ int main(int argc, char** argv)
 				
                 read(fd, command, 256);
 
-                printf("::%s", command);
-                
 				if (handle_request(command, fd) > 0)
                 {
 					// Close the file descriptor
@@ -160,10 +158,10 @@ int main(int argc, char** argv)
                         perror("Close");
                         exit(1);
                     }
+
+                    // Remove fd from set
+                    FD_CLR(fd, &afds);
                 }
-				
-				// Remove fd from set
-                FD_CLR(fd, &afds);
             }
         }
     }
@@ -189,9 +187,9 @@ int handle_request(const char* command, const int fd)
 	else if (strncmp(command, "JOIN ", 5) == 0)
     {
         mess = join(command);
-        //return 1;
+        write(fd, mess.c_str(), strlen(mess.c_str()));
+        return 1;
     }
-    printf("mess: %s with size %d\n", mess.c_str(), strlen(mess.c_str()));
 	write(fd, mess.c_str(), strlen(mess.c_str()));
 	return 0;
 }
@@ -203,6 +201,8 @@ void* start_server(void* data)
     int port = *((int*)data);
 
     struct sockaddr_in cr_addr, cli_addr;
+
+    vector<int> fdset;
 
     if ((m_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -244,6 +244,8 @@ void* start_server(void* data)
 
     printf("Chatroom socket running\n");
 
+    int old = 1;
+
     // Run the chatroom
     while (1)
     {
@@ -267,24 +269,31 @@ void* start_server(void* data)
 
             // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
+            fdset.push_back(s_sock);
         }
-		for (int fd = 0; fd < nfds; fd++)
+		for (int fd = 3; fd < nfds; fd++)
         {
             // If the socket has activity on it
             if (fd != m_sock && FD_ISSET(fd, &rfds))
             {
-                read(fd, message, MAX_MESSAGE);
+                if (read(fd, message, MAX_MESSAGE) < 0)
+                {
+                    perror("Chatroom read");
+                    exit(1);
+                }
 
                 // Trying to broadcast message to all others
-                // for (int kfd = 0; fd < nfds; fd++)
-                // {
-                    // if (fd != kfd)
-                    // {
-                        // write(fd, message, MAX_MESSAGE);
-                    // }
-                // }
-
-                write(fd, message, MAX_MESSAGE);
+                for (int k = 0; k < fdset.size(); k++)
+                {
+                    if (fd != fdset.at(k))
+                    {
+                        if (write(fdset.at(k), message, MAX_MESSAGE) < 0)
+                        {
+                            perror("Chatroom write");
+                            exit(1);
+                        }
+                    }
+                }
             }
         }
     }

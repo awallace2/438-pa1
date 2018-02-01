@@ -19,6 +19,7 @@ using namespace std;
 int connect_to(const char *host, const int port);
 struct Reply process_command(const int sockfd, char* command);
 void process_chatmode(const char* host, const int port);
+void* receive_message(void* socket);
 
 int main(int argc, char** argv) 
 {
@@ -133,6 +134,7 @@ struct Reply process_command(const int sockfd, char* command)
 			if (strncmp(command, "JOIN", 4) == 0) {
                 reply.num_member = atoi(buf.substr(8, 9).c_str());
 				reply.port = atoi(buf.substr(10).c_str());
+				close(sockfd);
 			} 
 			else if (strncmp(command, "LIST", 4) == 0) {
 				stpcpy(reply.list_room, buf.substr(8).c_str());
@@ -197,21 +199,54 @@ void process_chatmode(const char* host, const int port)
     //    Don't have to worry about this situation, and you can 
     //    terminate the client program by pressing CTRL-C (SIGINT)
 	// ------------------------------------------------------------
-	printf("Connecting to %s:%d\n", host, port);
 
 	int fd = connect_to(host, port);
 
-	printf("Connected to %s:%d\n", host, port);
+	char message[MAX_MESSAGE];
+
+	pthread_t th;
+	pthread_attr_t ta;
+	pthread_attr_init(&ta);
+	pthread_attr_setdetachstate(&ta, PTHREAD_CREATE_DETACHED);
+
+	// Create the new server on the new socket
+	int* fd_ptr = new int;
+	*fd_ptr = fd;
+	pthread_create(&th, &ta, receive_message, (void*) fd_ptr);
 
 	while (1)
 	{
-		char message[MAX_MESSAGE];
+		// If something has been written
 		get_message(message, MAX_MESSAGE);
-
-		write(fd, message, MAX_MESSAGE);
-		read(fd, message, MAX_MESSAGE);
-
-		printf("Message %s sent!\n", message);
+		if (write(fd, message, MAX_MESSAGE) < 0)
+		{
+			perror("Message failed to send");
+			exit(1);
+		}
+		bzero(message, MAX_MESSAGE);
 	}
 }
 
+void* receive_message(void* socket)
+{
+	int fd = *((int*)socket);
+
+	char message[MAX_MESSAGE];
+	bzero(message, MAX_MESSAGE);
+
+	while (1)
+	{
+		if (read(fd, message, MAX_MESSAGE) < 0)
+		{
+			perror("Failed to get message");
+			exit(1);
+		}
+
+		if (strlen(message) > 0)
+		{
+			printf(": %s\n", message);
+		}
+
+		bzero(message, MAX_MESSAGE);
+	}
+}
