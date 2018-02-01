@@ -334,7 +334,6 @@ string create(const char *chatroom)
 		newRoom.port_num = atoi(pstr);
 		newRoom.num_members = 0;
 		room_db.push_back(newRoom);
-		printf("Chatroom %s created\n", chatroom);
     }
     // TODO: If not, create a new master socket
     // TODO: Create an entry for the new chat room in the local database, and store the name and the port number of the new chat room
@@ -373,7 +372,7 @@ string list(const char *chatroom)
 	else{
 		ret += "SUCCESS";
 	}
-	printf("size %d", room_db.size());
+	
 	for(int i=0;i<room_db.size();i++){
 		ret += ","+room_db[i].room_name;
 	}

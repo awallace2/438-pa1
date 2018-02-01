@@ -142,9 +142,6 @@ struct Reply process_command(const int sockfd, char* command)
 			else if (strncmp(command, "DELETE", 7) == 0) {
 				stpcpy(reply.list_room, buf.substr(8).c_str());
 			}
-			else if (strncmp(command, "CREATE", 7) == 0) {
-                reply.port = atoi(buf.substr(8).c_str());
-			}
 		}
 		else if(buf.substr(0, 22) == "FAILURE_ALREADY_EXISTS"){
 			reply.status = FAILURE_ALREADY_EXISTS;
@@ -159,6 +156,7 @@ struct Reply process_command(const int sockfd, char* command)
 			reply.status = FAILURE_UNKNOWN;
 		}	
     }
+
 	return reply;
 }
 
