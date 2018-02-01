@@ -149,6 +149,8 @@ int main(int argc, char** argv)
                 memset(command, 0, 256);
 				
                 read(fd, command, 256);
+
+                printf("::%s", command);
                 
 				if (handle_request(command, fd) > 0)
                 {
@@ -189,7 +191,8 @@ int handle_request(const char* command, const int fd)
         mess = join(command);
         //return 1;
     }
-	write(fd, mess.c_str(), sizeof(mess.c_str()));
+    printf("mess: %s with size %d\n", mess.c_str(), strlen(mess.c_str()));
+	write(fd, mess.c_str(), strlen(mess.c_str()));
 	return 0;
 }
 
@@ -338,13 +341,15 @@ string join(const char* chatroom)
 	for(int i=0; i<room_db.size(); i++){
 		if(room_db[i].room_name == name){
 			ret = "SUCCESS";
-			ret += to_string(room_db[i].num_members);
+			ret += " " + to_string(room_db[i].num_members);
 			ret += " " + to_string(room_db[i].port_num);
 		}
 	}
     // TODO: Check if chatroom exists already
     // TODO: If it does, return the port number of the master socket of that chat room and the current number of memebers in the chatroom
     // TODO: Client will then connect to the chat room through that port
+
+    printf("%s\n", ret.c_str());
 	return ret;
 }
 

@@ -118,7 +118,7 @@ struct Reply process_command(const int sockfd, char* command)
 
         return reply;
     }
-		
+
     write(sockfd, command, strlen(command));
 	
     // Receive the command from the server
@@ -127,7 +127,7 @@ struct Reply process_command(const int sockfd, char* command)
     if (read(sockfd, buffer, MAX_DATA) != 0)
     {
 		buf=buffer;
-		printf("ON CLIENT: %s\n", buffer);
+		printf("buffer: %s\n", buffer);
 		if(buf.substr(0, 7) == "SUCCESS"){
 			reply.status = SUCCESS;
 			if (strncmp(command, "JOIN", 4) == 0) {
