@@ -128,7 +128,7 @@ struct Reply process_command(const int sockfd, char* command)
 
     write(sockfd, command, strlen(command));
 	
-    // Receive the command from the server
+    // Receive the command from the server and process different replys
     char buffer[1024] = {0};
 	string buf;
     if (read(sockfd, buffer, MAX_DATA) != 0)
@@ -146,6 +146,7 @@ struct Reply process_command(const int sockfd, char* command)
 			}
 			else if (strncmp(command, "DELETE", 6) == 0) {
 				stpcpy(reply.list_room, buf.substr(13).c_str());
+				// Set port for deletion
 				reply.port = atoi(buf.substr(8, 12).c_str());
 			}
 		}
@@ -229,6 +230,7 @@ void process_chatmode(const char* host, const int port, int sockfd)
 		}
 		bzero(message, MAX_MESSAGE);
 
+		// If read thread sets this to -1, it's time to go bye bye
 		if (*fd_ptr == -1)
 		{
 			break;
@@ -243,6 +245,7 @@ void process_delete(const char* host, const int port)
 
 	string message = "/delete";
 
+	// Send command to server to delete
 	write(fd, message.c_str(), MAX_MESSAGE);
 }
 
@@ -254,6 +257,7 @@ void* receive_message(void* socket)
 	char message[MAX_MESSAGE];
 	bzero(message, MAX_MESSAGE);
 
+	// Get messages from server
 	while (1)
 	{
 		if (read(fd, message, MAX_MESSAGE) < 0)
@@ -267,6 +271,7 @@ void* receive_message(void* socket)
 			printf("%d: %s\n", fd, message);
 		}
 
+		// If told chatrrom is being deleted, let's wrap things up on client chatroom
 		if (strncmp(message, "chat room being deleted", 20) == 0)
 		{
 			*((int*)socket) = -1;
