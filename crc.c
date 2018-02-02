@@ -7,10 +7,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 #include "interface.h"
 
 #define MAX_MESSAGE 128
-
+using namespace std;
 
 /*
  * TODO: IMPLEMENT BELOW THREE FUNCTIONS
@@ -18,6 +19,7 @@
 int connect_to(const char *host, const int port);
 struct Reply process_command(const int sockfd, char* command);
 void process_chatmode(const char* host, const int port);
+void* receive_message(void* socket);
 
 int main(int argc, char** argv) 
 {
@@ -106,77 +108,6 @@ int connect_to(const char *host, const int port)
  */
 struct Reply process_command(const int sockfd, char* command)
 {
-	// ------------------------------------------------------------
-	// GUIDE 1:
-	// In this function, you are supposed to parse a given command
-	// and create your own message in order to communicate with
-	// the server. Surely, you can use the input command without
-	// any changes if your server understand it. The given command
-    // will be one of the followings:
-	//
-	// CREATE <name>
-	// DELETE <name>
-	// JOIN <name>
-    // LIST
-	//
-	// -  "<name>" is a chatroom name that you want to create, delete,
-	// or join.
-	// 
-	// - CREATE/DELETE/JOIN and "<name>" are separated by one space.
-	// ------------------------------------------------------------
-
-
-	// ------------------------------------------------------------
-	// GUIDE 2:
-	// After you create the message, you need to send it to the
-	// server and receive a result from the server.
-	// ------------------------------------------------------------
-
-
-	// ------------------------------------------------------------
-	// GUIDE 3:
-	// Then, you should create a variable of Reply structure
-	// provided by the interface and initialize it according to
-	// the result.
-	//
-	// For example, if a given command is "JOIN room1"
-	// and the server successfully created the chatroom,
-	// the server will reply a message including information about
-	// success/failure, the number of members and port number.
-	// By using this information, you should set the Reply variable.
-	// the variable will be set as following:
-	//
-	// Reply reply;
-	// reply.status = SUCCESS;
-	// reply.num_member = number;
-	// reply.port = port;
-	// 
-	// "number" and "port" variables are just an integer variable
-	// and can be initialized using the message fomr the server.
-	//
-	// For another example, if a given command is "CREATE room1"
-	// and the server failed to create the chatroom becuase it
-	// already exists, the Reply varible will be set as following:
-	//
-	// Reply reply;
-	// reply.status = FAILURE_ALREADY_EXISTS;
-    // 
-    // For the "LIST" command,
-    // You are suppose to copy the list of chatroom to the list_room
-    // variable. Each room name should be seperated by comma ','.
-    // For example, if given command is "LIST", the Reply variable
-    // will be set as following.
-    //
-    // Reply reply;
-    // reply.status = SUCCESS;
-    // strcpy(reply.list_room, list);
-    // 
-    // "list" is a string that contains a list of chat rooms such 
-    // as "r1,r2,r3,"
-	// ------------------------------------------------------------
-
-    // touppercase(command, strlen(command) - 1);
-
 	struct Reply reply;
 	reply.status = FAILURE_UNKNOWN;
 
@@ -189,35 +120,42 @@ struct Reply process_command(const int sockfd, char* command)
         return reply;
     }
 
-	if (strncmp(command, "CREATE ", 7) == 0)
-	{
-		// Send command to the server
-		write(sockfd, command, strlen(command));
-
-		// Receive the command from the server
-		char port[MAX_DATA];
-		if (read(sockfd, port, MAX_DATA) != 0)
-		{
+    write(sockfd, command, strlen(command));
+	
+    // Receive the command from the server
+    char buffer[1024] = {0};
+	string buf;
+    if (read(sockfd, buffer, MAX_DATA) != 0)
+    {
+		buf=buffer;
+		printf("buffer: %s\n", buffer);
+		if(buf.substr(0, 7) == "SUCCESS"){
 			reply.status = SUCCESS;
-			reply.num_member = 0;
-			reply.port = atoi(port);
+			if (strncmp(command, "JOIN", 4) == 0) {
+                reply.num_member = atoi(buf.substr(8, 9).c_str());
+				reply.port = atoi(buf.substr(10).c_str());
+				close(sockfd);
+			} 
+			else if (strncmp(command, "LIST", 4) == 0) {
+				stpcpy(reply.list_room, buf.substr(8).c_str());
+			}
+			else if (strncmp(command, "DELETE", 7) == 0) {
+				stpcpy(reply.list_room, buf.substr(8).c_str());
+			}
 		}
-	}
-    else if (strncmp(command, "JOIN ", 5) == 0)
-	{
-		write(sockfd, command, strlen(command));
-
-		// TODO: Read for struct reply
-
-		// Receive the command from the server
-		char port[MAX_DATA];
-		if (read(sockfd, port, MAX_DATA) != 0)
-		{
-			reply.status = SUCCESS;
-			reply.num_member = 1;
-			reply.port = atoi(port);
+		else if(buf.substr(0, 22) == "FAILURE_ALREADY_EXISTS"){
+			reply.status = FAILURE_ALREADY_EXISTS;
 		}
-	}
+		else if(buf.substr(0, 18) == "FAILURE_NOT_EXISTS"){
+			reply.status = FAILURE_NOT_EXISTS;
+		}
+		else if(buf.substr(0, 15) == "FAILURE_INVALID"){
+			reply.status = FAILURE_INVALID;
+		}
+		else{
+			reply.status = FAILURE_UNKNOWN;
+		}	
+    }
 
 	return reply;
 }
@@ -244,7 +182,7 @@ void process_chatmode(const char* host, const int port)
 	// At the same time, the client should wait for a message from
 	// the server.
 	// ------------------------------------------------------------
-
+	
     // ------------------------------------------------------------
     // IMPORTANT NOTICE:
     // 1. To get a message from a user, you should use a function
@@ -262,51 +200,51 @@ void process_chatmode(const char* host, const int port)
 
 	int fd = connect_to(host, port);
 
-	fd_set rfds, afds;
-	int nfds = FD_SETSIZE;
-
-	FD_ZERO(&afds);
-	// Put sever in fd_set
-	FD_SET(fd, &afds);
-	// Put stdin in fd_set
-	FD_SET(STDIN_FILENO, &afds);
-
 	char message[MAX_MESSAGE];
 
-	// Child process send messages
+	pthread_t th;
+	pthread_attr_t ta;
+	pthread_attr_init(&ta);
+	pthread_attr_setdetachstate(&ta, PTHREAD_CREATE_DETACHED);
+
+	// Create the new server on the new socket
+	int* fd_ptr = new int;
+	*fd_ptr = fd;
+	pthread_create(&th, &ta, receive_message, (void*) fd_ptr);
+
 	while (1)
 	{
-		memcpy(&rfds, &afds, sizeof(rfds));
-
-		if (select(nfds, &rfds, 0, 0, 0) < 0)
+		// If something has been written
+		get_message(message, MAX_MESSAGE);
+		if (write(fd, message, MAX_MESSAGE) < 0)
 		{
-			perror("Client chatroom select");
+			perror("Message failed to send");
 			exit(1);
 		}
-
-		for (int i = 3; i < nfds; i++)
-		{
-			// If something has been written
-			if (FD_ISSET(STDIN_FILENO, &rfds))
-			{
-				get_message(message, MAX_MESSAGE);
-				if (write(fd, message, MAX_MESSAGE) < 0)
-				{
-					perror("Message failed to send");
-					exit(1);
-				}
-			}
-
-			if (FD_ISSET(fd, &rfds))
-			{
-				if (read(fd, message, MAX_MESSAGE) < 0)
-				{
-					perror("Failed to recieve message");
-					exit(1);
-				}
-				printf(": %s\n", message);
-			}
-		}
+		bzero(message, MAX_MESSAGE);
 	}
 }
 
+void* receive_message(void* socket)
+{
+	int fd = *((int*)socket);
+
+	char message[MAX_MESSAGE];
+	bzero(message, MAX_MESSAGE);
+
+	while (1)
+	{
+		if (read(fd, message, MAX_MESSAGE) < 0)
+		{
+			perror("Failed to get message");
+			exit(1);
+		}
+
+		if (strlen(message) > 0)
+		{
+			printf(": %s\n", message);
+		}
+
+		bzero(message, MAX_MESSAGE);
+	}
+}

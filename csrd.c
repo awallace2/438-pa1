@@ -3,31 +3,35 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <pthread.h>
 
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <pthread.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
+#include <vector>
 #include "interface.h"
 
 #define MAX_MESSAGE 128
 #define MAX_MEMBER 32
 #define MAX_ROOM 32
 
+using namespace std;
+
 int handle_request(const char* command, const int port);
 void* start_server(void* data);
-struct Reply create(const char* chatroom);
-struct Reply join(const char* chatroom);
-struct Reply list(void);
-struct Reply del(const char* chatroom);
+string create(const char* chatroom);
+string join(const char* chatroom);
+string list(const char* chatroom);
+string del(const char* chatroom);
 
-typedef struct 
+typedef struct
 {
     // Name of chatroom
-    char room_name[256];
+    string room_name;
     // Port number to join the chatroom
     int port_num;
     // # of members in chatroom
@@ -36,9 +40,8 @@ typedef struct
     int slave_socket[MAX_MEMBER];
 } chat_room;
 
-chat_room room_db[MAX_ROOM];
-
 int port;
+vector<chat_room> room_db;
 
 int main(int argc, char** argv)
 {
@@ -68,9 +71,9 @@ int main(int argc, char** argv)
         perror("Command master socket");
         exit(1);
     }
-
-    // Allow for reuse of address
-    int opt = 1;
+	
+	// Allow for reuse of address
+	int opt = 1;
     if (setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0)
     {
         perror("Set socket options");
@@ -98,7 +101,9 @@ int main(int argc, char** argv)
 
     fd_set rfds, afds;
     int nfds = FD_SETSIZE;
-
+	struct Reply reply;
+	
+	std::string lol;
     FD_ZERO(&afds);
     FD_SET(m_sock, &afds);  // Add master socket
 
@@ -134,28 +139,29 @@ int main(int argc, char** argv)
             // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
         }
-
+		char command[256];
         for (int fd = 0; fd < nfds; fd++)
         {
+			// If the socket has activity on it
             if (fd != m_sock && FD_ISSET(fd, &rfds))
             {
-                char* command = (char*) malloc((MAX_DATA) * sizeof(char));
-
-                read(fd, command, MAX_DATA);
-
                 // TODO: Handle request... with sends and receives
-                if (handle_request(command, fd) > 0)
+                memset(command, 0, 256);
+				
+                read(fd, command, 256);
+
+				if (handle_request(command, fd) > 0)
                 {
-                    // Close the file descriptor
+					// Close the file descriptor
                     if (close(fd) < 0)
                     {
                         perror("Close");
                         exit(1);
                     }
-                }
 
-                // Remove fd from set
-                FD_CLR(fd, &afds);
+                    // Remove fd from set
+                    FD_CLR(fd, &afds);
+                }
             }
         }
     }
@@ -163,36 +169,29 @@ int main(int argc, char** argv)
 
 int handle_request(const char* command, const int fd)
 {
+	string mess="";
     if (strncmp(command, "CREATE ", 7) == 0)
     {
         // TODO: Check if already exists
-        
-        pthread_t th;
-        pthread_attr_t ta;
-        pthread_attr_init(&ta);
-        pthread_attr_setdetachstate(&ta, PTHREAD_CREATE_DETACHED);
-
-        // Create the new server on the new socket
-        int* port_ptr = new int;
-        *port_ptr = port;
-        pthread_create(&th, &ta, start_server, (void*) port_ptr);
-        
-        // Send port back to client
-        char pstr[5];
-        sprintf(pstr, "%d", port);
-        write(fd, pstr, strlen(pstr));
-
-        return 0;
+		mess = create(command);
+        //return 0;
     }
-    else if (strncmp(command, "JOIN ", 5) == 0)
+	else if (strncmp(command, "DELETE ", 7) == 0)
+	{
+		mess = del(command);
+	}
+	else if (strncmp(command, "LIST", 4) == 0)
+	{
+		mess = list(command);
+	}
+	else if (strncmp(command, "JOIN ", 5) == 0)
     {
-        // TODO: Search if server exists, then get port
-        char pstr[6];
-        sprintf(pstr, "%d", port);
-        write(fd, pstr, strlen(pstr));
-
+        mess = join(command);
+        write(fd, mess.c_str(), strlen(mess.c_str()));
         return 1;
     }
+	write(fd, mess.c_str(), strlen(mess.c_str()));
+	return 0;
 }
 
 void* start_server(void* data)
@@ -202,6 +201,8 @@ void* start_server(void* data)
     int port = *((int*)data);
 
     struct sockaddr_in cr_addr, cli_addr;
+
+    vector<int> fdset;
 
     if ((m_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -215,8 +216,8 @@ void* start_server(void* data)
         perror("Set socket options");
         exit(1);
     }
-
-    bzero((char*) &cr_addr, sizeof(cr_addr));
+	
+	bzero((char*) &cr_addr, sizeof(cr_addr));
     cr_addr.sin_family = AF_INET;
     cr_addr.sin_addr.s_addr = INADDR_ANY;
     cr_addr.sin_port = htons(port++);
@@ -238,10 +239,12 @@ void* start_server(void* data)
 
     FD_ZERO(&afds);
     FD_SET(m_sock, &afds);
-
-    char* message = (char*) malloc((MAX_DATA) * sizeof(char));
+	
+	char* message = (char*) malloc((MAX_DATA) * sizeof(char));
 
     printf("Chatroom socket running\n");
+
+    int old = 1;
 
     // Run the chatroom
     while (1)
@@ -255,8 +258,7 @@ void* start_server(void* data)
             perror("Chatroom select");
             exit(1);
         }
-
-        if (FD_ISSET(m_sock, &rfds))
+		if (FD_ISSET(m_sock, &rfds))
         {
             socklen_t size = sizeof(cli_addr);
             if ((s_sock = accept(m_sock, (struct sockaddr*) &cli_addr, &size)) < 0)
@@ -265,26 +267,31 @@ void* start_server(void* data)
                 exit(1);
             }
 
-            printf("Someone joined the chatroom!\n");
-
             // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
+            fdset.push_back(s_sock);
         }
-
-        for (int fd = 3; fd < nfds; fd++)
+		for (int fd = 3; fd < nfds; fd++)
         {
             // If the socket has activity on it
             if (fd != m_sock && FD_ISSET(fd, &rfds))
             {
-                read(fd, message, MAX_MESSAGE);
+                if (read(fd, message, MAX_MESSAGE) < 0)
+                {
+                    perror("Chatroom read");
+                    exit(1);
+                }
 
                 // Trying to broadcast message to all others
-                for (int kfd = 3; kfd < 16; kfd++)
+                for (int k = 0; k < fdset.size(); k++)
                 {
-                    if (fd != kfd)
+                    if (fd != fdset.at(k))
                     {
-                        printf("Sending message from %d to %d\n", fd, kfd);
-                        write(kfd, message, MAX_MESSAGE);
+                        if (write(fdset.at(k), message, MAX_MESSAGE) < 0)
+                        {
+                            perror("Chatroom write");
+                            exit(1);
+                        }
                     }
                 }
             }
@@ -292,30 +299,106 @@ void* start_server(void* data)
     }
 }
 
-struct Reply create(const char* chatroom)
+string create(const char *chatroom)
 {
-    // TODO: Check if chatroom exists already
+	chatroom += 7;
+	
+	string name=chatroom;
+	string ret="SUCCESS";
+	
+	for(int i=0; i<room_db.size(); i++){
+		if(room_db[i].room_name == name){
+			ret="FAILURE_ALREADY_EXISTS";
+		}
+	}
+	if(ret == "SUCCESS"){
+		//CREATE NEQ PORT HERE
+		pthread_t th;
+        pthread_attr_t ta;
+        pthread_attr_init(&ta);
+        pthread_attr_setdetachstate(&ta, PTHREAD_CREATE_DETACHED);
+
+        // Create the new server on the new socket
+        int* port_ptr = new int;
+        *port_ptr = port;
+        pthread_create(&th, &ta, start_server, (void*) port_ptr);
+        
+        // Send port back to client
+        char pstr[5];
+        sprintf(pstr, "%d", port);
+		string p(pstr);
+		ret += " " + p;
+		
+		chat_room newRoom;
+		newRoom.room_name = chatroom;
+		newRoom.port_num = atoi(pstr);
+		newRoom.num_members = 0;
+		room_db.push_back(newRoom);
+    }
     // TODO: If not, create a new master socket
     // TODO: Create an entry for the new chat room in the local database, and store the name and the port number of the new chat room
     // TODO: Return a result to inform the client
+	return ret;
 }
 
-struct Reply join(const char* chatroom)
+string join(const char* chatroom)
 {
+	chatroom += 5;
+	string ret = "FAILURE_NOT_EXISTS";
+	string name = chatroom;
+	
+	for(int i=0; i<room_db.size(); i++){
+		if(room_db[i].room_name == name){
+			ret = "SUCCESS";
+			ret += " " + to_string(room_db[i].num_members);
+			ret += " " + to_string(room_db[i].port_num);
+		}
+	}
     // TODO: Check if chatroom exists already
     // TODO: If it does, return the port number of the master socket of that chat room and the current number of memebers in the chatroom
     // TODO: Client will then connect to the chat room through that port
+
+    printf("%s\n", ret.c_str());
+	return ret;
 }
 
-struct Reply list()
+string list(const char *chatroom)
 {
+	string ret="";
+	
+	if((chatroom += 4) == '\0'){
+		ret += "FAILURE_INVALID";
+	}
+	else{
+		ret += "SUCCESS";
+	}
+	
+	for(int i=0;i<room_db.size();i++){
+		ret += ","+room_db[i].room_name;
+	}
+	
+	return ret;
     // TODO: Return the names of all chatrooms
 }
 
-struct Reply del(const char* chatroom)
+string del(const char *chatroom)
 {
+	chatroom += 7;
+	string ret = "FAILURE_NOT_EXISTS";
+	string name = chatroom;
+	
+	for(int i=0; i<room_db.size(); i++){
+		if(room_db[i].room_name == name){
+			ret="SUCCESS";
+			room_db.erase(room_db.begin() + i);
+		}
+	}
+	for(int i=0;i<room_db.size();i++){
+		ret += ","+room_db[i].room_name;
+	}
     // TODO: Check if chatroom exits already
     // TODO: If it does, send the warning message "chat room being deleted" to all connected clients before terminating their connections, closing the master socket, and deleting the entry
     // TODO: Inform the client about the result
+	return ret;
 }
 
