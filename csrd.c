@@ -27,6 +27,7 @@ string create(const char* chatroom);
 string join(const char* chatroom);
 string list(const char* chatroom);
 string del(const char* chatroom);
+void fdHelp(const char* command);
 
 typedef struct
 {
@@ -37,10 +38,13 @@ typedef struct
     // # of members in chatroom
     int num_members;
     // Slave sockets
-    int slave_socket[MAX_MEMBER];
+    vector<int> slave_socket;
+	
+	pthread_t pt;
 } chat_room;
 
 int port;
+int numPortsCreated;
 vector<chat_room> room_db;
 
 int main(int argc, char** argv)
@@ -85,6 +89,7 @@ int main(int argc, char** argv)
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     port = atoi(argv[2]);
     serv_addr.sin_port = htons(port++);
+	numPortsCreated=0;
 
     if (bind(m_sock, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0)
     {
@@ -103,7 +108,6 @@ int main(int argc, char** argv)
     int nfds = FD_SETSIZE;
 	struct Reply reply;
 	
-	std::string lol;
     FD_ZERO(&afds);
     FD_SET(m_sock, &afds);  // Add master socket
 
@@ -190,15 +194,31 @@ int handle_request(const char* command, const int fd)
         write(fd, mess.c_str(), strlen(mess.c_str()));
         return 1;
     }
+	else if (strncmp(command, "FD ", 3)){
+		fdHelp(command);
+		return 1;
+	}
 	write(fd, mess.c_str(), strlen(mess.c_str()));
 	return 0;
+}
+
+void fdHelp(const char* command){
+	command += 3;
+	
+	string p=command;
+	
+	for(int i=0; i<room_db.size(); i++){
+		if(room_db[i].port_num == atoi((p.substr(0,4)).c_str())){
+			room_db[i].slave_socket.push_back(atoi((p.substr(5)).c_str()));
+		}
+	}
 }
 
 void* start_server(void* data)
 {
     int m_sock, s_sock;
-
-    int port = *((int*)data);
+	chat_room* room = (chat_room*)data;
+    int port = room->port_num;
 
     struct sockaddr_in cr_addr, cli_addr;
 
@@ -270,6 +290,9 @@ void* start_server(void* data)
             // Add socket to set of slave sockets
             FD_SET(s_sock, &afds);
             fdset.push_back(s_sock);
+			
+			printf("size of the fdset %d\n", fdset.size());
+			room->slave_socket = fdset;
         }
 		for (int fd = 3; fd < nfds; fd++)
         {
@@ -320,20 +343,23 @@ string create(const char *chatroom)
 
         // Create the new server on the new socket
         int* port_ptr = new int;
-        *port_ptr = port;
-        pthread_create(&th, &ta, start_server, (void*) port_ptr);
+        *port_ptr = port + numPortsCreated;
         
         // Send port back to client
         char pstr[5];
-        sprintf(pstr, "%d", port);
+        sprintf(pstr, "%d", (port+ numPortsCreated));
 		string p(pstr);
 		ret += " " + p;
 		
-		chat_room newRoom;
-		newRoom.room_name = chatroom;
-		newRoom.port_num = atoi(pstr);
-		newRoom.num_members = 0;
-		room_db.push_back(newRoom);
+		chat_room* newRoom = new chat_room();
+		newRoom->room_name = chatroom;
+		newRoom->port_num = atoi(pstr);
+		newRoom->num_members = 0;
+		newRoom->pt = th;
+		room_db.push_back(*newRoom);
+		numPortsCreated++;
+		
+		pthread_create(&th, &ta, start_server, (void*)newRoom);
     }
     // TODO: If not, create a new master socket
     // TODO: Create an entry for the new chat room in the local database, and store the name and the port number of the new chat room
@@ -349,6 +375,7 @@ string join(const char* chatroom)
 	
 	for(int i=0; i<room_db.size(); i++){
 		if(room_db[i].room_name == name){
+			room_db[i].num_members++;
 			ret = "SUCCESS";
 			ret += " " + to_string(room_db[i].num_members);
 			ret += " " + to_string(room_db[i].port_num);
@@ -377,6 +404,10 @@ string list(const char *chatroom)
 		ret += ","+room_db[i].room_name;
 	}
 	
+	if(room_db.size()==0){
+		ret += " empty";
+	}
+	
 	return ret;
     // TODO: Return the names of all chatrooms
 }
@@ -386,13 +417,36 @@ string del(const char *chatroom)
 	chatroom += 7;
 	string ret = "FAILURE_NOT_EXISTS";
 	string name = chatroom;
+	vector<int> fdset;
+	int socket;
 	
 	for(int i=0; i<room_db.size(); i++){
 		if(room_db[i].room_name == name){
 			ret="SUCCESS";
+			fdset = room_db[i].slave_socket;
+			printf("num slaves %d\n", room_db[i].slave_socket.size());
 			room_db.erase(room_db.begin() + i);
 		}
 	}
+	
+	
+	if(ret == "SUCCESS"){  
+		// Trying to broadcast message to all others
+		string message = "Warning: the chatting room is going to be closed...";
+		//int fd = *((int*)socket);
+		printf("i made it %s\n", message.c_str());
+		
+		for (int k = 0; k < fdset.size(); k++)
+		{
+			if (write(fdset.at(k), message.c_str(), strlen(message.c_str())) < 0)
+			{
+				perror("Chatroom write");
+				exit(1);
+			}
+			close(fdset.at(k));
+		}
+	}
+	
 	for(int i=0;i<room_db.size();i++){
 		ret += ","+room_db[i].room_name;
 	}

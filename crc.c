@@ -18,7 +18,7 @@ using namespace std;
  */
 int connect_to(const char *host, const int port);
 struct Reply process_command(const int sockfd, char* command);
-void process_chatmode(const char* host, const int port);
+void process_chatmode(const char* host, const int port, int sockfd);
 void* receive_message(void* socket);
 
 int main(int argc, char** argv) 
@@ -42,9 +42,9 @@ int main(int argc, char** argv)
 		display_reply(command, reply);
 		
 		touppercase(command, strlen(command) - 1);
-		if (strncmp(command, "JOIN", 4) == 0) {
+		if (strncmp(command, "JOIN", 4) == 0 && reply.status == SUCCESS) {
 			printf("Now you are in the chatmode\n");
-			process_chatmode(argv[1], reply.port);
+			process_chatmode(argv[1], reply.port, sockfd);
 		}
 	
 		close(sockfd);
@@ -166,7 +166,7 @@ struct Reply process_command(const int sockfd, char* command)
  * @parameter host     host address
  * @parameter port     port
  */
-void process_chatmode(const char* host, const int port)
+void process_chatmode(const char* host, const int port, int sockfd)
 {
 	// ------------------------------------------------------------
 	// GUIDE 1:
@@ -211,6 +211,12 @@ void process_chatmode(const char* host, const int port)
 	int* fd_ptr = new int;
 	*fd_ptr = fd;
 	pthread_create(&th, &ta, receive_message, (void*) fd_ptr);
+	
+	string fdInfo = "FD "+to_string(port)+" "+to_string(fd);
+	if(write(sockfd, fdInfo.c_str(), strlen(fdInfo.c_str())) < 0){
+		perror("shhhhiiittt");
+		exit(1);
+	}
 
 	while (1)
 	{
@@ -242,8 +248,16 @@ void* receive_message(void* socket)
 
 		if (strlen(message) > 0)
 		{
-			printf(": %s\n", message);
+			printf("%d: %s\n", fd, message);
 		}
+		
+		/*if(strncmp(message, "Warning", 7)){
+			if (close(fd) < 0)
+			{
+				perror("Close");
+				exit(1);
+			}
+		}*/
 
 		bzero(message, MAX_MESSAGE);
 	}
