@@ -305,6 +305,26 @@ void* start_server(void* data)
                     exit(1);
                 }
 
+                if (message = "/delete")
+                {
+                    string message = "Warning: the chatting room is going to be closed...";
+                    
+                    for (int k = 0; k < fdset.size(); k++)
+                    {
+                        if (fd != fdset.at(k))
+                        {
+                            if (write(fdset.at(k), message.c_str(), strlen(message.c_str())) < 0)
+                            {
+                                perror("Chatroom write");
+                                exit(1);
+                            }
+                            close(fdset.at(k));
+                        }
+                    }
+
+                    pthread_exit(NULL);
+                }
+
                 // Trying to broadcast message to all others
                 for (int k = 0; k < fdset.size(); k++)
                 {
@@ -417,39 +437,26 @@ string del(const char *chatroom)
 	chatroom += 7;
 	string ret = "FAILURE_NOT_EXISTS";
 	string name = chatroom;
-	vector<int> fdset;
 	int socket;
 	
 	for(int i=0; i<room_db.size(); i++){
 		if(room_db[i].room_name == name){
-			ret="SUCCESS";
-			fdset = room_db[i].slave_socket;
-			printf("num slaves %d\n", room_db[i].slave_socket.size());
+			ret="SUCCESS ";
+            ret += to_string(room_db[i].port_num);
 			room_db.erase(room_db.begin() + i);
-		}
-	}
-	
-	
-	if(ret == "SUCCESS"){  
-		// Trying to broadcast message to all others
-		string message = "Warning: the chatting room is going to be closed...";
-		//int fd = *((int*)socket);
-		printf("i made it %s\n", message.c_str());
-		
-		for (int k = 0; k < fdset.size(); k++)
-		{
-			if (write(fdset.at(k), message.c_str(), strlen(message.c_str())) < 0)
-			{
-				perror("Chatroom write");
-				exit(1);
-			}
-			close(fdset.at(k));
 		}
 	}
 	
 	for(int i=0;i<room_db.size();i++){
 		ret += ","+room_db[i].room_name;
 	}
+
+    if (room_db.size() == 0)
+    {
+        ret += ",EMPTY";
+    }
+
+    printf("%s\n", ret.c_str());
     // TODO: Check if chatroom exits already
     // TODO: If it does, send the warning message "chat room being deleted" to all connected clients before terminating their connections, closing the master socket, and deleting the entry
     // TODO: Inform the client about the result

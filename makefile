@@ -1,4 +1,4 @@
-CC=g++ -pthread
+CC=g++ -pthread -std=c++11
 
 HOST=http://localhost/
 PORT=6931

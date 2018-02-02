@@ -19,6 +19,7 @@ using namespace std;
 int connect_to(const char *host, const int port);
 struct Reply process_command(const int sockfd, char* command);
 void process_chatmode(const char* host, const int port, int sockfd);
+void process_delete(const char* host, const int port);
 void* receive_message(void* socket);
 
 int main(int argc, char** argv) 
@@ -45,6 +46,11 @@ int main(int argc, char** argv)
 		if (strncmp(command, "JOIN", 4) == 0 && reply.status == SUCCESS) {
 			printf("Now you are in the chatmode\n");
 			process_chatmode(argv[1], reply.port, sockfd);
+		    sockfd = connect_to(argv[1], atoi(argv[2]));
+		}
+
+		if (strncmp(command, "DELETE", 6) == 0 && reply.status == SUCCESS) {
+			process_delete(argv[1], reply.port);
 		}
 	
 		close(sockfd);
@@ -139,8 +145,11 @@ struct Reply process_command(const int sockfd, char* command)
 			else if (strncmp(command, "LIST", 4) == 0) {
 				stpcpy(reply.list_room, buf.substr(8).c_str());
 			}
-			else if (strncmp(command, "DELETE", 7) == 0) {
-				stpcpy(reply.list_room, buf.substr(8).c_str());
+			else if (strncmp(command, "DELETE", 6) == 0) {
+				printf("%s", buf);
+				reply.port = atoi(buf.substr(8, 12).c_str());
+				printf("We have port: %d\n", reply.port);
+				stpcpy(reply.list_room, buf.substr(13).c_str());
 			}
 		}
 		else if(buf.substr(0, 22) == "FAILURE_ALREADY_EXISTS"){
@@ -228,8 +237,25 @@ void process_chatmode(const char* host, const int port, int sockfd)
 			exit(1);
 		}
 		bzero(message, MAX_MESSAGE);
+
+		if (*fd_ptr == -1)
+		{
+			break;
+		}
 	}
 }
+
+
+void process_delete(const char* host, const int port)
+{
+	printf("%s:%d", host, port);
+	int fd = connect_to(host, port);
+
+	string message = "/delete";
+
+	write(fd, message.c_str(), MAX_MESSAGE);
+}
+
 
 void* receive_message(void* socket)
 {
@@ -250,6 +276,12 @@ void* receive_message(void* socket)
 		{
 			printf("%d: %s\n", fd, message);
 		}
+
+		// if (strncmp(message, "Warning: the chatting room is going to be closed...", 32))
+		// {
+		// 	*((int*)socket) = -1;
+		// 	pthread_exit(NULL);
+		// }
 		
 		/*if(strncmp(message, "Warning", 7)){
 			if (close(fd) < 0)
