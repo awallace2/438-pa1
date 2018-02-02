@@ -291,7 +291,6 @@ void* start_server(void* data)
             FD_SET(s_sock, &afds);
             fdset.push_back(s_sock);
 			
-			printf("size of the fdset %d\n", fdset.size());
 			room->slave_socket = fdset;
         }
 		for (int fd = 3; fd < nfds; fd++)
@@ -305,7 +304,7 @@ void* start_server(void* data)
                     exit(1);
                 }
 
-                if (message == "/delete")
+                if (strncmp(message, "/delete", 7) == 0)
                 {
                     string message = "Warning: the chatting room is going to be closed...";
                     
@@ -405,7 +404,6 @@ string join(const char* chatroom)
     // TODO: If it does, return the port number of the master socket of that chat room and the current number of memebers in the chatroom
     // TODO: Client will then connect to the chat room through that port
 
-    printf("%s\n", ret.c_str());
 	return ret;
 }
 
@@ -456,7 +454,6 @@ string del(const char *chatroom)
         ret += ",EMPTY";
     }
 
-    printf("%s\n", ret.c_str());
     // TODO: Check if chatroom exits already
     // TODO: If it does, send the warning message "chat room being deleted" to all connected clients before terminating their connections, closing the master socket, and deleting the entry
     // TODO: Inform the client about the result

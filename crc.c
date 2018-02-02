@@ -134,7 +134,6 @@ struct Reply process_command(const int sockfd, char* command)
     if (read(sockfd, buffer, MAX_DATA) != 0)
     {
 		buf=buffer;
-		printf("buffer: %s\n", buffer);
 		if(buf.substr(0, 7) == "SUCCESS"){
 			reply.status = SUCCESS;
 			if (strncmp(command, "JOIN", 4) == 0) {
@@ -146,10 +145,8 @@ struct Reply process_command(const int sockfd, char* command)
 				stpcpy(reply.list_room, buf.substr(8).c_str());
 			}
 			else if (strncmp(command, "DELETE", 6) == 0) {
-				printf("%s", buf);
-				reply.port = atoi(buf.substr(8, 12).c_str());
-				printf("We have port: %d\n", reply.port);
 				stpcpy(reply.list_room, buf.substr(13).c_str());
+				reply.port = atoi(buf.substr(8, 12).c_str());
 			}
 		}
 		else if(buf.substr(0, 22) == "FAILURE_ALREADY_EXISTS"){
@@ -248,7 +245,6 @@ void process_chatmode(const char* host, const int port, int sockfd)
 
 void process_delete(const char* host, const int port)
 {
-	printf("%s:%d", host, port);
 	int fd = connect_to(host, port);
 
 	string message = "/delete";
@@ -277,11 +273,11 @@ void* receive_message(void* socket)
 			printf("%d: %s\n", fd, message);
 		}
 
-		// if (strncmp(message, "Warning: the chatting room is going to be closed...", 32))
-		// {
-		// 	*((int*)socket) = -1;
-		// 	pthread_exit(NULL);
-		// }
+		if (strncmp(message, "Warning: the chatting room is going to be closed...", 32))
+		{
+			*((int*)socket) = -1;
+			pthread_exit(NULL);
+		}
 		
 		/*if(strncmp(message, "Warning", 7)){
 			if (close(fd) < 0)
