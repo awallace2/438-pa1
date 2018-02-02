@@ -305,7 +305,7 @@ void* start_server(void* data)
                     exit(1);
                 }
 
-                if (message = "/delete")
+                if (message == "/delete")
                 {
                     string message = "Warning: the chatting room is going to be closed...";
                     
