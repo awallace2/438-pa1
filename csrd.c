@@ -306,7 +306,7 @@ void* start_server(void* data)
 
                 if (strncmp(message, "/delete", 7) == 0)
                 {
-                    string message = "Warning: the chatting room is going to be closed...";
+                    string message = "chat room being deleted";
                     
                     for (int k = 0; k < fdset.size(); k++)
                     {

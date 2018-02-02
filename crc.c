@@ -218,12 +218,6 @@ void process_chatmode(const char* host, const int port, int sockfd)
 	*fd_ptr = fd;
 	pthread_create(&th, &ta, receive_message, (void*) fd_ptr);
 	
-	string fdInfo = "FD "+to_string(port)+" "+to_string(fd);
-	if(write(sockfd, fdInfo.c_str(), strlen(fdInfo.c_str())) < 0){
-		perror("shhhhiiittt");
-		exit(1);
-	}
-
 	while (1)
 	{
 		// If something has been written
@@ -273,20 +267,12 @@ void* receive_message(void* socket)
 			printf("%d: %s\n", fd, message);
 		}
 
-		if (strncmp(message, "Warning: the chatting room is going to be closed...", 32))
+		if (strncmp(message, "chat room being deleted", 20) == 0)
 		{
 			*((int*)socket) = -1;
 			pthread_exit(NULL);
 		}
 		
-		/*if(strncmp(message, "Warning", 7)){
-			if (close(fd) < 0)
-			{
-				perror("Close");
-				exit(1);
-			}
-		}*/
-
 		bzero(message, MAX_MESSAGE);
 	}
 }
