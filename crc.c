@@ -268,7 +268,7 @@ void* receive_message(void* socket)
 
 		if (strlen(message) > 0)
 		{
-			printf("%d: %s\n", fd, message);
+			printf("> %s\n", message);
 		}
 
 		// If told chatrrom is being deleted, let's wrap things up on client chatroom
